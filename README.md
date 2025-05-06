@@ -26,3 +26,4 @@ It extracts and compares the words in the PDFs, ignoring whitespace differences,
 - **Original PDF:** The untouched source document.
 - **Highlighted PDF:** PDFs with added, changed, or missing words highlighted in different colors.
 - **Combined Output:** A single PDF containing the original and highlighted versions side by side.
+[combined_output.pdf](https://github.com/user-attachments/files/20053319/combined_output.pdf)
