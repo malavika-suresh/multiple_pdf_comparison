@@ -20,6 +20,11 @@ It extracts and compares the words in the PDFs, ignoring whitespace differences,
 
 - PyMuPDF (fitz)
 - difflib (standard Python library)
+  
+<h2 style="color:black; font-weight:bold;">Notes:</h2>
+
+- The tool performs comparison on a page-by-page basis. If the PDF documents differ in the number of pages, it will compare up to the smallest page count.
+- Text formatting (e.g., font size, style) is not considered in the comparison; only the raw text content is compared.
 
 <h2 style="color:black; font-weight:bold;">Example Output:</h2>
 
