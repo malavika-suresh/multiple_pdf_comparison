@@ -90,5 +90,5 @@ if __name__ == "__main__":
     pdf1 = r"test1.pdf"
     pdf2 = r"test2.pdf"
     pdf3 = r"test3.pdf"
-    output_directory = "comparison_results_out"
+    output_directory = "comparison_results"
     compare_pdfs(pdf1, pdf2, pdf3, output_directory)
