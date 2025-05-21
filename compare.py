@@ -1,4 +1,4 @@
-import fitz  # PyMuPDF
+import fitz 
 from difflib import SequenceMatcher
 import os
 import re
