@@ -1,18 +1,44 @@
-import fitz 
+"""
+PDF Comparison Tool
+
+This script compares two PDF files against a base PDF, highlights differences,
+and generates a combined output for visual comparison.
+"""
+
+import fitz  # PyMuPDF
 from difflib import SequenceMatcher
 import os
 import re
+from typing import List, Dict, Tuple
 
 
-def extract_words(page):
+def extract_words(page: fitz.Page) -> List[Dict]:
+
     words = []
     word_list = page.get_text("words") 
-    for w in word_list:
-        words.append({"text": w[4], "rect": fitz.Rect(w[:4])})
+    for word in word_list:
+        words.append({
+            "text": word[4], 
+            "rect": fitz.Rect(word[:4])
+        })
     return words
 
 
-def highlight_word_differences(base_pdf_path, compare_pdf_path, output_path, color):
+def highlight_word_differences(
+    base_pdf_path: str, 
+    compare_pdf_path: str, 
+    output_path: str, 
+    color: Tuple[float, float, float]
+) -> None:
+    """
+    Highlight differences between two PDFs by comparing words.
+    
+    Args:
+        base_pdf_path: Path to the base/reference PDF
+        compare_pdf_path: Path to the PDF to compare against base
+        output_path: Path to save the highlighted PDF
+        color: RGB tuple for highlight color
+    """
     base_doc = fitz.open(base_pdf_path)
     compare_doc = fitz.open(compare_pdf_path)
 
@@ -23,72 +49,97 @@ def highlight_word_differences(base_pdf_path, compare_pdf_path, output_path, col
         base_words = extract_words(base_page)
         compare_words = extract_words(compare_page)
 
-        base_text = [re.sub(r'\s+', '', w["text"]) for w in base_words]
-        compare_text = [re.sub(r'\s+', '', w["text"]) for w in compare_words]
+        # Normalize text by removing whitespace for comparison
+        base_text = [re.sub(r'\s+', '', word["text"]) for word in base_words]
+        compare_text = [re.sub(r'\s+', '', word["text"]) for word in compare_words]
 
         matcher = SequenceMatcher(None, base_text, compare_text)
 
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag in ("insert", "replace", "delete"):
+        for operation, i1, i2, j1, j2 in matcher.get_opcodes():
+            if operation in ("insert", "replace", "delete"):
                 for idx in range(j1, j2):
                     if idx < len(compare_words):
                         rect = compare_words[idx]["rect"]
-                        annot = compare_page.add_highlight_annot(rect)
-                        annot.set_colors(stroke=color)
-                        annot.update()
+                        highlight = compare_page.add_highlight_annot(rect)
+                        highlight.set_colors(stroke=color)
+                        highlight.update()
 
     compare_doc.save(output_path)
     base_doc.close()
     compare_doc.close()
 
 
-def merge_horizontally(pdf_paths, output_path):
-    pdf_docs = [fitz.open(p) for p in pdf_paths]
-    num_pages = min([len(doc) for doc in pdf_docs])
+def merge_pdfs_horizontally(
+    pdf_paths: List[str], 
+    output_path: str,
+    dpi: int = 150
+) -> None:
+   
+    pdf_documents = [fitz.open(path) for path in pdf_paths]
+    num_pages = min(len(doc) for doc in pdf_documents)
 
-    output = fitz.open()
-    for i in range(num_pages):
-        pages = [doc.load_page(i) for doc in pdf_docs]
+    output_document = fitz.open()
+    
+    for page_num in range(num_pages):
+        pages = [doc.load_page(page_num) for doc in pdf_documents]
         widths = [page.rect.width for page in pages]
         heights = [page.rect.height for page in pages]
 
         new_width = sum(widths)
         new_height = max(heights)
-        new_page = output.new_page(width=new_width, height=new_height)
+        new_page = output_document.new_page(width=new_width, height=new_height)
 
         x_offset = 0
         for page in pages:
-            pix = page.get_pixmap(dpi=150)
-            img_rect = fitz.Rect(x_offset, 0, x_offset + page.rect.width, page.rect.height)
-            new_page.insert_image(img_rect, pixmap=pix)
+            pixmap = page.get_pixmap(dpi=dpi)
+            img_rect = fitz.Rect(
+                x_offset, 
+                0, 
+                x_offset + page.rect.width, 
+                page.rect.height
+            )
+            new_page.insert_image(img_rect, pixmap=pixmap)
             x_offset += page.rect.width
 
-    output.save(output_path)
-    output.close()
-    for doc in pdf_docs:
+    output_document.save(output_path)
+    output_document.close()
+    
+    for doc in pdf_documents:
         doc.close()
 
 
-def compare_pdfs(pdf1_path, pdf2_path, pdf3_path, output_dir):
-    os.makedirs(output_dir, exist_ok=True)
+def compare_pdfs(
+    base_pdf_path: str,
+    comparison_pdf1_path: str,
+    comparison_pdf2_path: str,
+    output_directory: str
+) -> None:
 
-    pdf2_highlighted = os.path.join(output_dir, "pdf2_highlighted.pdf")
-    pdf3_highlighted = os.path.join(output_dir, "pdf3_highlighted.pdf")
+    os.makedirs(output_directory, exist_ok=True)
 
-    highlight_word_differences(pdf1_path, pdf2_path, pdf2_highlighted, (1, 0, 0))  # Red
-    highlight_word_differences(pdf1_path, pdf3_path, pdf3_highlighted, (0, 1, 0))  # Green
+    output_path1 = os.path.join(output_directory, "comparison1_highlighted.pdf")
+    output_path2 = os.path.join(output_directory, "comparison2_highlighted.pdf")
 
-    merge_horizontally(
-        [pdf1_path, pdf2_highlighted, pdf3_highlighted],
-        os.path.join(output_dir, "combined_output.pdf")
+    
+    highlight_word_differences(base_pdf_path, comparison_pdf1_path, output_path1, (1, 0, 0))
+    highlight_word_differences(base_pdf_path, comparison_pdf2_path, output_path2, (0, 1, 0))
+
+   
+    merged_output_path = os.path.join(output_directory, "combined_comparison.pdf")
+    merge_pdfs_horizontally(
+        [base_pdf_path, output_path1, output_path2],
+        merged_output_path
     )
 
-    print(f"✅ Comparison complete. Output saved at: {output_dir}/combined_output.pdf")
+    print(f"Comparison complete. Output saved to: {merged_output_path}")
 
 
 if __name__ == "__main__":
-    pdf1 = "test1.pdf"
-    pdf2 = "test2.pdf"
-    pdf3 = "test3.pdf"
-    output_directory = "comparison_results_out"
-    compare_pdfs(pdf1, pdf2, pdf3, output_directory)
+    # Example usage
+    BASE_PDF = r"pdfs\test1.pdf"
+    COMPARISON_PDF1 = r"pdfs\test2.pdf"
+    COMPARISON_PDF2 = r"pdfs\test3.pdf"
+    OUTPUT_DIR = "comparison_results"
+    
+    compare_pdfs(BASE_PDF, COMPARISON_PDF1, COMPARISON_PDF2, OUTPUT_DIR)
+
